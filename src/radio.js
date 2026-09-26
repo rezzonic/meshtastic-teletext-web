@@ -7,7 +7,7 @@
 // A T-Echo accepts one Bluetooth connection at a time: while this app is
 // connected, the Meshtastic app cannot use the same device.
 
-import { create, toBinary } from "@bufbuild/protobuf";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 import { MeshDevice, Protobuf, Constants } from "@meshtastic/core";
 import { TransportWebBluetooth } from "@meshtastic/transport-web-bluetooth";
 import { Watchdog } from "./core.js";
@@ -144,8 +144,7 @@ export class Radio {
       this.transport = await this._openTransport(this.btDevice);
       this._log("lien Bluetooth etabli, service Meshtastic trouve");
       const device = new MeshDevice(this.transport, CONFIG_ONLY_NONCE);
-      // The library logs every packet at trace level; warnings are enough.
-      device.log.settings.minLevel = 4;
+      this._tameLogger(device.log);
       this.device = device;
       this._listen(device);
       this._log("demande de la configuration au T-Echo");
@@ -195,7 +194,14 @@ export class Radio {
     fromRadio.readValue = async () => {
       const value = await read();
       stats.reads += 1;
-      if (value.byteLength === 0) stats.empty += 1;
+      const size = value.byteLength;
+      if (size === 0) {
+        stats.empty += 1;
+      } else {
+        stats.minSize = Math.min(stats.minSize ?? size, size);
+        stats.maxSize = Math.max(stats.maxSize ?? size, size);
+        this._checkDecodes(value);
+      }
       return value;
     };
     fromNum.addEventListener("characteristicvaluechanged", () => {
@@ -204,12 +210,60 @@ export class Radio {
     return new TransportWebBluetooth(toRadio, fromRadio, fromNum, gatt);
   }
 
+  /** Journal the first few reads that do not decode, as hex, so that a
+   * truncated or mixed-up read can be seen rather than guessed. */
+  _checkDecodes(view) {
+    if ((this.undecodable ?? 0) >= 3) return;
+    const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+    try {
+      fromBinary(Protobuf.Mesh.FromRadioSchema, bytes);
+    } catch (err) {
+      this.undecodable = (this.undecodable ?? 0) + 1;
+      const hex = [...bytes.slice(0, 48)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      this.core.journal(`lecture illisible (${bytes.length} o): ${hex} -- ${describe(err)}`);
+    }
+  }
+
   _logStats() {
     const s = this.stats;
     if (s) {
-      this.core.journal(`lectures ${s.reads} (dont ${s.empty} vides), `
-        + `notifications ${s.notifications}, operations mises en attente ${s.waited}`);
+      this.core.journal(`lectures ${s.reads} (dont ${s.empty} vides, tailles `
+        + `${s.minSize ?? "-"}..${s.maxSize ?? "-"} octets), notifications `
+        + `${s.notifications}, operations mises en attente ${s.waited}`);
     }
+    const kinds = Object.entries(this.kinds ?? {}).map(([k, n]) => `${k} ${n}`);
+    if (kinds.length) this.core.journal(`elements recus: ${kinds.join(", ")}`);
+  }
+
+  /**
+   * The logger bundled in @meshtastic/core is tslog's Node build. For every
+   * message it lets through it masks "password" values, and that code calls
+   * Buffer.isBuffer -- which does not exist in a browser. So the first warning
+   * threw inside the decoding stream and killed it silently. Firmware 2.7
+   * sends a deviceuiConfig right after the node identity, a variant the
+   * library does not handle and warns about: the identity arrived, then
+   * nothing was ever understood again.
+   *
+   * Make isBuffer safe (the runtime object is shared by every logger), skip
+   * masking and formatting, and copy warnings and errors to the journal.
+   */
+  _tameLogger(log) {
+    log.runtime.isBuffer = () => false;
+    log.settings.maskValuesOfKeys = [];
+    log.settings.type = "hidden";
+    log.settings.minLevel = 4; // warnings and errors; trace is every packet
+    const seen = new Set();
+    log.attachTransport((entry) => {
+      const parts = [];
+      for (let i = 0; i in entry; i += 1) {
+        const arg = entry[i];
+        parts.push(arg?.message ?? (typeof arg === "string" ? arg : JSON.stringify(arg)));
+      }
+      const text = parts.slice(1).join(" ").trim(); // parts[0] is the emitter
+      if (!text || seen.has(text) || seen.size > 20) return;
+      seen.add(text);
+      this.core.journal(`biblio: ${text}`);
+    });
   }
 
   /** Read whatever the T-Echo has, every `ms`, without waiting to be told. */
@@ -241,6 +295,16 @@ export class Radio {
     const roles = Protobuf.Channel.Channel_Role;
     const dog = this.watchdog;
     const counts = { nodes: 0, configs: 0 };
+    this.kinds = {};
+    this.undecodable = 0;
+
+    // Every item that decodes, of any kind, is progress; and the tally says
+    // what the firmware actually sent.
+    device.events.onFromRadio.subscribe((message) => {
+      dog.kick();
+      const kind = message.payloadVariant?.case ?? "inconnu";
+      this.kinds[kind] = (this.kinds[kind] ?? 0) + 1;
+    });
 
     // Everything the configuration is made of counts as progress.
     device.events.onNodeInfoPacket.subscribe(() => {

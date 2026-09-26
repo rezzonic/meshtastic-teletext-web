@@ -4,143 +4,10 @@
 // the protocol, the journal, the watchdog and the request packet.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { create, toBinary, fromBinary } from "@bufbuild/protobuf";
-import { Protobuf, Constants } from "@meshtastic/core";
+import { Constants } from "@meshtastic/core";
 import { ReaderCore } from "../src/core.js";
 import { Radio } from "../src/radio.js";
-
-const Mesh = Protobuf.Mesh;
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const ME = 0x974d3740;
-
-function frame(variant) {
-  const msg = create(Mesh.FromRadioSchema, { id: 0, payloadVariant: variant });
-  return toBinary(Mesh.FromRadioSchema, msg);
-}
-
-/**
- * A fake T-Echo behind a fake GATT server.
- * @param {object} o
- * @param {number} o.nodes node records sent unless the config-only nonce is used
- * @param {boolean} o.honourNonce whether it knows the 69420 nonce
- * @param {number} o.stepMs delay between two configuration items
- * @param {number} o.stallAfter stop answering after this many items
- */
-function fakeTEcho({
-  nodes = 0, honourNonce = true, stepMs = 5, stallAfter = Infinity, notify = true,
-  notifyStartMs = 300,
-} = {}) {
-  const outbox = [];
-  const written = [];
-  const listeners = new Set();
-  let items = 0;
-
-  // Each item becomes readable `stepMs` after the previous one, like the
-  // T-Echo preparing them one by one; a read in between comes back empty.
-  const push = (bytes) => {
-    outbox.push(bytes);
-    if (notify) for (const fn of listeners) fn();
-  };
-
-  function sendConfig(nonce) {
-    const plan = [
-      frame({ case: "myInfo", value: create(Mesh.MyNodeInfoSchema, { myNodeNum: ME }) }),
-      frame({ case: "metadata", value: create(Mesh.DeviceMetadataSchema, { firmwareVersion: "2.7.9" }) }),
-    ];
-    const n = honourNonce && nonce === 69420 ? 0 : nodes;
-    for (let i = 0; i < n; i++) {
-      plan.push(frame({ case: "nodeInfo", value: create(Mesh.NodeInfoSchema, { num: i + 1 }) }));
-    }
-    const channel = (index, role, name) => frame({
-      case: "channel",
-      value: create(Protobuf.Channel.ChannelSchema, { index, role, settings: { name } }),
-    });
-    const R = Protobuf.Channel.Channel_Role;
-    plan.push(channel(0, R.PRIMARY, ""), channel(1, R.SECONDARY, "KNZ"),
-      channel(2, R.SECONDARY, "TXT"), channel(3, R.DISABLED, ""));
-    plan.push(frame({ case: "configCompleteId", value: nonce }));
-    let k = 0;
-    const tick = () => {
-      if (k >= plan.length || items >= stallAfter) return;
-      items += 1;
-      push(plan[k++]);
-      setTimeout(tick, stepMs);
-    };
-    tick();
-  }
-
-  // Like Chrome on Android: one GATT operation at a time per device, each
-  // taking a little while; starting another meanwhile fails. Enabling
-  // notifications (a CCCD write) is the slow one.
-  let busy = false;
-  const collisions = [];
-  async function gattOp(name, ms, fn) {
-    if (busy) {
-      collisions.push(name);
-      const err = new Error("GATT operation already in progress.");
-      err.name = "NetworkError";
-      throw err;
-    }
-    busy = true;
-    try {
-      await wait(ms);
-      return fn();
-    } finally {
-      busy = false;
-    }
-  }
-
-  const characteristic = (uuid) => ({
-    uuid,
-    readValue: () => gattOp("read", 10, () => {
-      const bytes = outbox.shift() ?? new Uint8Array(0);
-      const copy = new Uint8Array(bytes);
-      return new DataView(copy.buffer);
-    }),
-    writeValue: (buffer) => gattOp("write", 15, () => {
-      const msg = fromBinary(Mesh.ToRadioSchema, new Uint8Array(buffer));
-      written.push(msg);
-      if (msg.payloadVariant.case === "wantConfigId") sendConfig(msg.payloadVariant.value);
-    }),
-    startNotifications: () => gattOp("startNotifications", notifyStartMs, () => {}),
-    stopNotifications() {},
-    addEventListener(_type, fn) { listeners.add(fn); },
-    removeEventListener(_type, fn) { listeners.delete(fn); },
-  });
-
-  const gatt = {
-    connected: true,
-    device: null,
-    async connect() { return gatt; },
-    disconnect() { gatt.connected = false; },
-    async getPrimaryService() {
-      return { getCharacteristic: async (uuid) => characteristic(uuid) };
-    },
-  };
-  const device = {
-    name: "Meshtastic_3740",
-    gatt,
-    addEventListener() {},
-    removeEventListener() {},
-  };
-  gatt.device = device;
-
-  /** A text message heard on `channel`, as the radio would pass it up. */
-  function hear(text, channel = 2, from = 0x1111) {
-    const packet = create(Mesh.MeshPacketSchema, {
-      from, to: Constants.broadcastNum, channel, id: 7,
-      payloadVariant: {
-        case: "decoded",
-        value: { portnum: Protobuf.Portnums.PortNum.TEXT_MESSAGE_APP,
-          payload: new TextEncoder().encode(text) },
-      },
-    });
-    push(frame({ case: "packet", value: packet }));
-  }
-
-  return { device, written, hear, collisions };
-}
-
+import { fakeTEcho, wait, ME } from "./fake-techo.js";
 
 async function until(check, ms = 3000) {
   const end = Date.now() + ms;
@@ -201,7 +68,7 @@ test("without notifications, polling still reads the configuration and pages", a
   await radio.connect();
   assert.ok(await until(() => radio.status === "pret", 5000), core.log.join("\n"));
   assert.equal(core.channelIndex, 2);
-  assert.ok(core.log.some((l) => /lectures \d+ \(dont \d+ vides\), notifications 0/.test(l)),
+  assert.ok(core.log.some((l) => /lectures \d+ \(dont \d+ vides, tailles .*\), notifications 0/.test(l)),
     core.log.join("\n"));
   echo.hear("T301 1/1 14:40\nALERTES");
   assert.ok(await until(() => core.registry.has(301), 3000), "page read by the idle poll");
@@ -219,6 +86,36 @@ test("never two Bluetooth operations at once", async (t) => {
   assert.ok(await until(() => echo.written.some((m) => m.payloadVariant.case === "packet")));
   assert.deepEqual(echo.collisions, []);
   assert.ok(!core.log.some((l) => l.includes("ERREUR GATT")), core.log.join("\n"));
+});
+
+test("in a browser, a library warning no longer kills the decoding", async (t) => {
+  // The fourth real run: identity, then 67 reads never understood. The
+  // bundled logger calls Buffer.isBuffer on every warning, and a browser has
+  // no Buffer; deviceuiConfig, right after the identity, triggers a warning.
+  const saved = globalThis.Buffer;
+  delete globalThis.Buffer;
+  t.after(() => { globalThis.Buffer = saved; });
+  const echo = fakeTEcho({ notify: false });
+  const { core, radio } = setup(echo, 2000);
+  t.after(() => radio.disconnect());
+  await radio.connect();
+  assert.ok(await until(() => radio.status === "pret", 5000), core.log.join("\n"));
+  assert.equal(core.channelIndex, 2);
+  assert.ok(core.log.some((l) => /biblio: .*deviceuiConfig/.test(l)), core.log.join("\n"));
+  assert.ok(core.log.some((l) => /elements recus: .*deviceuiConfig 1/.test(l)), core.log.join("\n"));
+  assert.ok(!core.log.some((l) => l.includes("lecture illisible")), core.log.join("\n"));
+});
+
+test("unreadable reads are shown as hex", async (t) => {
+  const echo = fakeTEcho({ garbleAfter: 1 });
+  const { core, radio } = setup(echo, 500);
+  t.after(() => radio.disconnect());
+  await radio.connect();
+  assert.ok(await until(() => core.errors.length > 0, 4000), core.log.join("\n"));
+  const hex = core.log.filter((l) => l.includes("lecture illisible"));
+  assert.ok(hex.length >= 1 && hex.length <= 3, core.log.join("\n"));
+  assert.match(hex[0], /lecture illisible \(\d+ o\): [0-9a-f]+ -- /);
+  assert.ok(core.log.some((l) => /tailles \d+\.\.\d+ octets/.test(l)), core.log.join("\n"));
 });
 
 test("a T-Echo that goes silent is reported and released", async () => {

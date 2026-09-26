@@ -73,6 +73,17 @@ ouvre donc le transport lui-même et fait passer toutes les lectures, écritures
 et activations par un même verrou ; le journal indique combien ont dû attendre
 leur tour, et nomme toute erreur GATT.
 
+**Le journal interne de la bibliothèque plantait le décodage** : le logger
+embarqué dans `@meshtastic/core` est la version Node de tslog ; pour chaque
+avertissement il appelle `Buffer.isBuffer`, qui n'existe pas dans un
+navigateur. Un firmware 2.7 envoie juste après l'identité une
+`deviceuiConfig` que la bibliothèque ne gère pas et signale par un
+avertissement : l'exception tuait le flux de décodage, et plus rien n'était
+compris (« noeud local », puis des dizaines de lectures perdues). Le lecteur
+rend `isBuffer` sûr, coupe masquage et mise en forme, et recopie les
+avertissements de la bibliothèque dans le journal (« biblio: … ») avec le
+décompte des éléments reçus par type.
+
 **« le T-Echo n'envoie plus rien depuis 20 s »** : la connexion est libérée,
 touchez **Reconnecter**. Si cela se répète, vérifiez que l'app Meshtastic
 n'est pas connectée au même T-Echo (Paramètres Android → Applications →
@@ -90,6 +101,13 @@ npm test          # format et logique, sans navigateur ni radio
 npm run dev       # serveur local ; Web Bluetooth marche sur localhost
 npm run build     # dans dist/
 ```
+
+`test/fake-techo.js` simule un T-Echo (firmware 2.7) derrière un faux serveur
+GATT, aussi strict que Chrome sur Android. `npm test` le fait tourner sous
+Node ; `test/browser/harness.html`, compilé avec la configuration de
+l'application (`npx vite build --config test/browser/vite.config.js`, sortie
+dans `dist-harness/`), le fait tourner dans un vrai navigateur, sans `Buffer`
+ni rien de Node -- la différence qui a caché le défaut du logger.
 
 | Fichier | Rôle |
 |---|---|
