@@ -131,6 +131,10 @@ function render() {
     error.textContent = `${core.errors[0].time} ${core.errors[0].text}`;
   }
 
+  $("journal-count").textContent = core.log.length ? `(${core.log.length})` : "";
+  const lines = core.log.join("\n");
+  if ($("journal-lines").textContent !== lines) $("journal-lines").textContent = lines;
+
   const status = $("status");
   status.className = "status";
   const connect = $("connect");
@@ -195,9 +199,28 @@ $("connect").addEventListener("click", async () => {
     else await radio.choose();
   } catch (err) {
     // Closing the device chooser lands here too; that is not an error.
-    if (err?.name !== "NotFoundError") core.error(err.message ?? err);
+    if (err?.name === "NotFoundError") core.journal("liste fermee sans choix");
+    else core.error(`${err?.name ?? "Erreur"}: ${err?.message ?? err}`);
     render();
   }
+});
+
+$("journal-copy").addEventListener("click", async () => {
+  const text = [
+    `teletext-web ${location.href}`,
+    `navigateur ${navigator.userAgent}`,
+    `etat ${radio.status}, canal ${core.channelIndex ?? "?"}`,
+    ...core.log,
+  ].join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    core.note = "journal copie";
+  } catch {
+    // No clipboard permission: select the text so it can be copied by hand.
+    getSelection().selectAllChildren($("journal-lines"));
+    core.note = "selectionnez et copiez le journal a la main";
+  }
+  render();
 });
 
 // Coming back to the app after the phone slept: offer the link again.
@@ -247,6 +270,8 @@ function demoRadio() {
 // ------------------------------------------------------------------ start
 
 if (!DEMO) loadPages();
+core.journal(DEMO ? "mode demo, sans radio"
+  : bluetoothAvailable() ? "pret: touchez Connecter" : "Web Bluetooth indisponible");
 if (!DEMO && !bluetoothAvailable()) $("unsupported").hidden = false;
 render();
 setInterval(render, 1000); // ages move even when nothing arrives

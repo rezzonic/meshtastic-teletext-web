@@ -142,3 +142,34 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
   font-size: 14px;
 }
 .unsupported a { color: var(--cyan); }
+
+.journal {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto 16px;
+  padding: 0 16px;
+  font: 13px var(--mono);
+  color: var(--dim);
+}
+.journal summary { cursor: pointer; padding: 8px 0; min-height: 32px; }
+.journal pre {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  max-height: 40dvh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #0b0b0b;
+  border: 1px solid #262626;
+  border-radius: 8px;
+  color: var(--fg);
+}
+.journal button {
+  font: 600 14px system-ui, sans-serif;
+  color: #000;
+  background: var(--cyan);
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 40px;
+}

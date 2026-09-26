@@ -1,7 +1,7 @@
 // ReaderCore: the same behaviour as ClientCore in the terminal client.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ReaderCore } from "../src/core.js";
+import { ReaderCore, Watchdog, LOG_LINES } from "../src/core.js";
 
 const T0 = new Date(2026, 8, 26, 14, 40);
 const ME = 0x1234;
@@ -98,4 +98,40 @@ test("errors are kept, newest first, bounded", () => {
   assert.equal(core.errors.length, 20);
   assert.equal(core.errors[0].text, "e29");
   assert.equal(core.errors[0].time, "14:40:00");
+});
+
+test("journal: timestamped, bounded, errors included", () => {
+  const { core } = reader();
+  core.journal("appareil choisi: T-Echo B");
+  core.error("connexion impossible");
+  assert.deepEqual(core.log, [
+    "14:40:00 appareil choisi: T-Echo B",
+    "14:40:00 ERREUR connexion impossible",
+  ]);
+  for (let i = 0; i < 100; i++) core.journal(`ligne ${i}`);
+  assert.equal(core.log.length, LOG_LINES);
+  assert.equal(core.log.at(-1), "14:40:00 ligne 99");
+});
+
+test("watchdog fires once unless stopped", () => {
+  const pending = new Map();
+  let next = 1;
+  const timers = {
+    setTimeout: (fn, ms) => { pending.set(next, { fn, ms }); return next++; },
+    clearTimeout: (id) => pending.delete(id),
+  };
+  let fired = 0;
+  const dog = new Watchdog(25_000, () => { fired += 1; }, timers);
+  dog.start();
+  assert.equal(dog.running, true);
+  assert.equal([...pending.values()][0].ms, 25_000);
+  dog.stop();
+  assert.equal(pending.size, 0);
+  assert.equal(dog.running, false);
+  dog.start();
+  dog.start(); // restarting replaces, never stacks
+  assert.equal(pending.size, 1);
+  [...pending.values()][0].fn();
+  assert.equal(fired, 1);
+  assert.equal(dog.running, false);
 });

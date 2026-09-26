@@ -10,6 +10,40 @@ import { PageRegistry, decode, INDEX_PAGE, pad3 } from "./teletext.js";
 export const REQUEST_EVERY_MS = 60_000;
 export const REQUEST_GAP_MS = 10_000;
 
+// Lines kept in the connection journal.
+export const LOG_LINES = 50;
+
+/**
+ * Fires `onFire` once unless stopped within `ms`. The connection uses it to
+ * say so when configuration never completes, instead of waiting forever.
+ * Timers are injectable for tests.
+ */
+export class Watchdog {
+  constructor(ms, onFire, timers = globalThis) {
+    this.ms = ms;
+    this.onFire = onFire;
+    this.timers = timers;
+    this.id = null;
+  }
+
+  start() {
+    this.stop();
+    this.id = this.timers.setTimeout(() => {
+      this.id = null;
+      this.onFire();
+    }, this.ms);
+  }
+
+  stop() {
+    if (this.id !== null) this.timers.clearTimeout(this.id);
+    this.id = null;
+  }
+
+  get running() {
+    return this.id !== null;
+  }
+}
+
 export class ReaderCore {
   /**
    * @param {object} o
@@ -28,6 +62,7 @@ export class ReaderCore {
     this.typed = "";
     this.note = "";
     this.errors = []; // {time, text}, newest first
+    this.log = []; // connection journal, oldest first, for the Journal panel
     this.asked = new Map(); // page -> clock of our last request
     this.askedAt = new Map(); // page -> Date, for display
     this.lastAsk = null;
@@ -46,12 +81,23 @@ export class ReaderCore {
     return held;
   }
 
-  error(text) {
+  _time() {
     const t = this.now();
-    const time = [t.getHours(), t.getMinutes(), t.getSeconds()]
+    return [t.getHours(), t.getMinutes(), t.getSeconds()]
       .map((n) => String(n).padStart(2, "0")).join(":");
+  }
+
+  /** One line of the connection journal, which the user can copy and send. */
+  journal(text) {
+    this.log.push(`${this._time()} ${text}`);
+    if (this.log.length > LOG_LINES) this.log.splice(0, this.log.length - LOG_LINES);
+  }
+
+  error(text) {
+    const time = this._time();
     this.errors.unshift({ time, text: String(text) });
     this.errors.length = Math.min(this.errors.length, 20);
+    this.journal(`ERREUR ${text}`);
   }
 
   // ------------------------------------------------------------ requests

@@ -38,6 +38,28 @@ canal primaire : ce serait le maillage public.
 
 Pour voir l'interface sans radio : ajouter `?demo` à l'adresse.
 
+## Dépannage de la connexion
+
+Sous le pavé, **Journal de connexion** note chaque étape avec l'heure : appareil
+choisi, lien Bluetooth, configuration reçue, canaux vus (dont `TXT` et son
+indice), pages reçues, erreurs. **Copier le journal** le met dans le
+presse-papiers, avec la version du navigateur, pour le transmettre.
+
+**Pas de code PIN demandé** : normal si le téléphone est déjà appairé à ce
+T-Echo (par exemple pour l'app Meshtastic), ou si le T-Echo est en mode « PIN
+fixe ».
+
+**Bloqué après le choix de l'appareil** : le cas le plus probable est que
+l'app Meshtastic est encore connectée au même T-Echo. Son service se
+reconnecte tout seul en arrière-plan ; Android partage alors le lien Bluetooth
+entre les deux applications et l'app officielle consomme les données que ce
+lecteur attend. Au bout de 25 s le lecteur le dit et libère le lien. Remède :
+dans l'app Meshtastic, se déconnecter de ce T-Echo, puis Paramètres Android →
+Applications → Meshtastic → **Forcer l'arrêt**, et **Reconnecter**.
+
+**« pas de canal secondaire nomme TXT »** : le T-Echo n'a pas le canal, ou pas
+sous ce nom exact. Voir le README du dépôt principal.
+
 ## Développement
 
 ```
