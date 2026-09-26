@@ -39,6 +39,11 @@ export class Watchdog {
     this.id = null;
   }
 
+  /** Something arrived: restart the countdown, if one is running. */
+  kick() {
+    if (this.id !== null) this.start();
+  }
+
   get running() {
     return this.id !== null;
   }

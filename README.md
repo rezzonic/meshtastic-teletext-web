@@ -49,13 +49,18 @@ presse-papiers, avec la version du navigateur, pour le transmettre.
 T-Echo (par exemple pour l'app Meshtastic), ou si le T-Echo est en mode « PIN
 fixe ».
 
-**Bloqué après le choix de l'appareil** : le cas le plus probable est que
-l'app Meshtastic est encore connectée au même T-Echo. Son service se
-reconnecte tout seul en arrière-plan ; Android partage alors le lien Bluetooth
-entre les deux applications et l'app officielle consomme les données que ce
-lecteur attend. Au bout de 25 s le lecteur le dit et libère le lien. Remède :
-dans l'app Meshtastic, se déconnecter de ce T-Echo, puis Paramètres Android →
-Applications → Meshtastic → **Forcer l'arrêt**, et **Reconnecter**.
+**Longue attente après le choix de l'appareil** : à la connexion, un T-Echo
+envoie d'ordinaire toute sa base de nœuds, une fiche par nœud connu, avant ses
+canaux ; sur un maillage chargé, cela prend des dizaines de secondes en
+Bluetooth. Le lecteur demande donc la configuration seule (nonce `69420` du
+firmware) ; un firmware qui ne le connaît pas envoie tout quand même, et le
+journal montre alors la progression (« 25 fiches de noeuds recues... »).
+
+**« le T-Echo n'envoie plus rien depuis 20 s »** : la connexion est libérée,
+touchez **Reconnecter**. Si cela se répète, vérifiez que l'app Meshtastic
+n'est pas connectée au même T-Echo (Paramètres Android → Applications →
+Meshtastic → **Forcer l'arrêt**) : Android partage alors le lien Bluetooth
+entre les deux applications.
 
 **« pas de canal secondaire nomme TXT »** : le T-Echo n'a pas le canal, ou pas
 sous ce nom exact. Voir le README du dépôt principal.
@@ -73,7 +78,7 @@ npm run build     # dans dist/
 |---|---|
 | `src/teletext.js` | format des pages, porté de `teletext.py` |
 | `src/core.js` | toutes les décisions : filtrage, demandes, navigation |
-| `src/radio.js` | lien Bluetooth, via `@meshtastic/core` ; seule partie non testable hors appareil |
+| `src/radio.js` | lien Bluetooth, via `@meshtastic/core` ; testé contre un T-Echo simulé (`test/radio.test.js`), jamais contre un vrai hors téléphone |
 | `src/main.js` | écran, pavé, stockage du cache |
 | `src/shims/` | remplaçants navigateur pour le logger Node embarqué dans `@meshtastic/core` |
 

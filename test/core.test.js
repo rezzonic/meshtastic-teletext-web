@@ -135,3 +135,24 @@ test("watchdog fires once unless stopped", () => {
   assert.equal(fired, 1);
   assert.equal(dog.running, false);
 });
+
+test("watchdog kick restarts a running countdown, and only a running one", () => {
+  const pending = new Map();
+  let next = 1;
+  const timers = {
+    setTimeout: (fn, ms) => { pending.set(next, { fn, ms }); return next++; },
+    clearTimeout: (id) => pending.delete(id),
+  };
+  const dog = new Watchdog(20_000, () => {}, timers);
+  dog.kick(); // not started: stays idle
+  assert.equal(dog.running, false);
+  assert.equal(pending.size, 0);
+  dog.start();
+  const first = [...pending.keys()][0];
+  dog.kick(); // progress: a fresh 20 s from now
+  assert.equal(pending.size, 1);
+  assert.notEqual([...pending.keys()][0], first);
+  dog.stop();
+  dog.kick();
+  assert.equal(dog.running, false);
+});
