@@ -1,0 +1,22 @@
+{
+  "name": "meshtastic-teletext-web",
+  "version": "0.1.0",
+  "description": "Lecteur Android (PWA Web Bluetooth) du teletext Meshtastic",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "@bufbuild/protobuf": "2.8.0",
+    "@meshtastic/core": "2.6.7",
+    "@meshtastic/transport-web-bluetooth": "0.1.5"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  },
+  "private": true,
+  "type": "module"
+}
