@@ -25,7 +25,17 @@ const SILENCE_TIMEOUT_MS = 20_000;
 // use for the node database.
 const CONFIG_ONLY_NONCE = 69420;
 
-const RECONNECT = "Touchez Reconnecter. Si cela se repete, verifiez que l'app "
+// The transport reads the T-Echo only after a write and when the T-Echo
+// notifies "fromNum". One empty read while the device is still preparing its
+// next item (the nRF52 of a T-Echo prepares them asynchronously), plus a
+// notification that never comes, and nothing is ever read again: the first
+// real run stopped right after the node identity. So we also read on a
+// timer -- fast while configuring, slowly afterwards so pages still arrive
+// if notifications do not. An empty read is a few bytes over Bluetooth.
+const POLL_CONFIGURING_MS = 150;
+const POLL_IDLE_MS = 1000;
+
+const RECONNECT ="Touchez Reconnecter. Si cela se repete, verifiez que l'app "
   + "Meshtastic n'est pas connectee a ce T-Echo (forcez son arret).";
 const STUCK_LINK = `lien Bluetooth bloque (T-Echo hors de portee ou pris). ${RECONNECT}`;
 const STUCK_CONFIG = `le T-Echo n'envoie plus rien depuis ${SILENCE_TIMEOUT_MS / 1000} s. ${RECONNECT}`;
@@ -101,6 +111,7 @@ export class Radio {
       this._log("connexion Bluetooth (GATT)...");
       this.transport = await TransportWebBluetooth.createFromDevice(this.btDevice);
       this._log("lien Bluetooth etabli, service Meshtastic trouve");
+      this._instrument(this.transport);
       const device = new MeshDevice(this.transport, CONFIG_ONLY_NONCE);
       // The library logs every packet at trace level; warnings are enough.
       device.log.settings.minLevel = 4;
@@ -112,6 +123,7 @@ export class Radio {
       device.configure().catch((err) => {
         if (device === this.device) this.core.error(`configuration: ${describe(err)}`);
       });
+      this._poll(POLL_CONFIGURING_MS);
     } catch (err) {
       this.watchdog.stop();
       this.core.error(`connexion impossible: ${describe(err)}`);
@@ -122,12 +134,51 @@ export class Radio {
   /** Configuration never completed: say why it probably did not, and let go
    * of the link so that Reconnecter starts from scratch. */
   async _stuck() {
+    if (this.transport) this._logStats();
     this.core.error(this.transport ? STUCK_CONFIG : STUCK_LINK);
     await this.disconnect();
   }
 
+  /** Count reads, empty reads and notifications, for the journal: they tell
+   * a silent device from a link whose notifications never arrive. */
+  _instrument(transport) {
+    const stats = { reads: 0, empty: 0, notifications: 0 };
+    this.stats = stats;
+    const fromRadio = transport.fromRadioCharacteristic;
+    if (fromRadio?.readValue) {
+      const read = fromRadio.readValue.bind(fromRadio);
+      fromRadio.readValue = async () => {
+        const value = await read();
+        stats.reads += 1;
+        if (value.byteLength === 0) stats.empty += 1;
+        return value;
+      };
+    }
+    transport.fromNumCharacteristic?.addEventListener?.(
+      "characteristicvaluechanged", () => { stats.notifications += 1; });
+  }
+
+  _logStats() {
+    const s = this.stats;
+    if (s) {
+      this.core.journal(`lectures ${s.reads} (dont ${s.empty} vides), `
+        + `notifications ${s.notifications}`);
+    }
+  }
+
+  /** Read whatever the T-Echo has, every `ms`, without waiting to be told. */
+  _poll(ms) {
+    clearInterval(this.poller);
+    this.poller = setInterval(() => {
+      // readFromRadio returns at once if a read is already running.
+      this.transport?.readFromRadio?.().catch(() => {});
+    }, ms);
+  }
+
   async disconnect() {
     this.watchdog.stop();
+    clearInterval(this.poller);
+    this.poller = null;
     try {
       await this.transport?.disconnect();
     } catch {
@@ -165,8 +216,10 @@ export class Radio {
       core.journal(`etat: ${Status[s] ?? s}`);
       if (s === CONFIGURED) {
         dog.stop();
+        this._poll(POLL_IDLE_MS);
         core.journal(`configuration recue: ${counts.nodes} fiches de noeuds, `
           + `${counts.configs} reglages`);
+        this._logStats();
       }
       this._set(Status[s] ?? String(s));
       if (s === CONFIGURED && core.channelIndex === null) {

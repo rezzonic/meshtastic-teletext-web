@@ -56,6 +56,14 @@ Bluetooth. Le lecteur demande donc la configuration seule (nonce `69420` du
 firmware) ; un firmware qui ne le connaît pas envoie tout quand même, et le
 journal montre alors la progression (« 25 fiches de noeuds recues... »).
 
+**Lecture périodique** : la bibliothèque Bluetooth ne lit le T-Echo qu'après
+une écriture ou sur sa notification « fromNum ». Une lecture vide pendant que
+le T-Echo prépare l'élément suivant, puis aucune notification, et plus rien
+n'était lu : c'est ce qui arrêtait la configuration juste après « noeud
+local ». Le lecteur lit donc aussi toutes les 150 ms pendant la configuration,
+puis chaque seconde. Le journal compte les lectures, les lectures vides et les
+notifications reçues.
+
 **« le T-Echo n'envoie plus rien depuis 20 s »** : la connexion est libérée,
 touchez **Reconnecter**. Si cela se répète, vérifiez que l'app Meshtastic
 n'est pas connectée au même T-Echo (Paramètres Android → Applications →

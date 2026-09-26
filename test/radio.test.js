@@ -25,15 +25,19 @@ function frame(variant) {
  * @param {number} o.stepMs delay between two configuration items
  * @param {number} o.stallAfter stop answering after this many items
  */
-function fakeTEcho({ nodes = 0, honourNonce = true, stepMs = 5, stallAfter = Infinity } = {}) {
+function fakeTEcho({
+  nodes = 0, honourNonce = true, stepMs = 5, stallAfter = Infinity, notify = true,
+} = {}) {
   const outbox = [];
   const written = [];
-  let notify = null;
+  const listeners = new Set();
   let items = 0;
 
+  // Each item becomes readable `stepMs` after the previous one, like the
+  // T-Echo preparing them one by one; a read in between comes back empty.
   const push = (bytes) => {
     outbox.push(bytes);
-    notify?.();
+    if (notify) for (const fn of listeners) fn();
   };
 
   function sendConfig(nonce) {
@@ -77,8 +81,8 @@ function fakeTEcho({ nodes = 0, honourNonce = true, stepMs = 5, stallAfter = Inf
     },
     async startNotifications() {},
     stopNotifications() {},
-    addEventListener(_type, fn) { notify = fn; },
-    removeEventListener() { notify = null; },
+    addEventListener(_type, fn) { listeners.add(fn); },
+    removeEventListener(_type, fn) { listeners.delete(fn); },
   });
 
   const gatt = {
@@ -164,6 +168,21 @@ test("a long node download is not cut off while it progresses", async (t) => {
   assert.equal(core.errors.length, 0, core.log.join("\n"));
   assert.ok(core.log.some((l) => l.includes("300 fiches de noeuds recues")));
   assert.equal(core.channelIndex, 2);
+});
+
+test("without notifications, polling still reads the configuration and pages", async (t) => {
+  // The first real run: one item read right after want_config, the next read
+  // empty because the device was not ready, and no notification ever after.
+  const echo = fakeTEcho({ notify: false, stepMs: 20 });
+  const { core, radio } = setup(echo, 2000);
+  t.after(() => radio.disconnect());
+  await radio.connect();
+  assert.ok(await until(() => radio.status === "pret", 5000), core.log.join("\n"));
+  assert.equal(core.channelIndex, 2);
+  assert.ok(core.log.some((l) => /lectures \d+ \(dont \d+ vides\), notifications 0/.test(l)),
+    core.log.join("\n"));
+  echo.hear("T301 1/1 14:40\nALERTES");
+  assert.ok(await until(() => core.registry.has(301), 3000), "page read by the idle poll");
 });
 
 test("a T-Echo that goes silent is reported and released", async () => {
