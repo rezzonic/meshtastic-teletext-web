@@ -10,6 +10,7 @@ import { ReaderCore } from "../src/core.js";
 import { Radio } from "../src/radio.js";
 
 const Mesh = Protobuf.Mesh;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const ME = 0x974d3740;
 
 function frame(variant) {
@@ -27,6 +28,7 @@ function frame(variant) {
  */
 function fakeTEcho({
   nodes = 0, honourNonce = true, stepMs = 5, stallAfter = Infinity, notify = true,
+  notifyStartMs = 300,
 } = {}) {
   const outbox = [];
   const written = [];
@@ -67,19 +69,40 @@ function fakeTEcho({
     tick();
   }
 
+  // Like Chrome on Android: one GATT operation at a time per device, each
+  // taking a little while; starting another meanwhile fails. Enabling
+  // notifications (a CCCD write) is the slow one.
+  let busy = false;
+  const collisions = [];
+  async function gattOp(name, ms, fn) {
+    if (busy) {
+      collisions.push(name);
+      const err = new Error("GATT operation already in progress.");
+      err.name = "NetworkError";
+      throw err;
+    }
+    busy = true;
+    try {
+      await wait(ms);
+      return fn();
+    } finally {
+      busy = false;
+    }
+  }
+
   const characteristic = (uuid) => ({
     uuid,
-    async readValue() {
+    readValue: () => gattOp("read", 10, () => {
       const bytes = outbox.shift() ?? new Uint8Array(0);
       const copy = new Uint8Array(bytes);
       return new DataView(copy.buffer);
-    },
-    async writeValue(buffer) {
+    }),
+    writeValue: (buffer) => gattOp("write", 15, () => {
       const msg = fromBinary(Mesh.ToRadioSchema, new Uint8Array(buffer));
       written.push(msg);
       if (msg.payloadVariant.case === "wantConfigId") sendConfig(msg.payloadVariant.value);
-    },
-    async startNotifications() {},
+    }),
+    startNotifications: () => gattOp("startNotifications", notifyStartMs, () => {}),
     stopNotifications() {},
     addEventListener(_type, fn) { listeners.add(fn); },
     removeEventListener(_type, fn) { listeners.delete(fn); },
@@ -115,10 +138,9 @@ function fakeTEcho({
     push(frame({ case: "packet", value: packet }));
   }
 
-  return { device, written, hear };
+  return { device, written, hear, collisions };
 }
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function until(check, ms = 3000) {
   const end = Date.now() + ms;
@@ -183,6 +205,20 @@ test("without notifications, polling still reads the configuration and pages", a
     core.log.join("\n"));
   echo.hear("T301 1/1 14:40\nALERTES");
   assert.ok(await until(() => core.registry.has(301), 3000), "page read by the idle poll");
+});
+
+test("never two Bluetooth operations at once", async (t) => {
+  // The third real run: the want_config write collided with enabling
+  // notifications and a poll read, failed, and nothing was ever asked.
+  const echo = fakeTEcho({ nodes: 50, honourNonce: false, notify: false });
+  const { core, radio } = setup(echo, 2000);
+  t.after(() => radio.disconnect());
+  await radio.connect();
+  assert.ok(await until(() => radio.status === "pret", 8000), core.log.join("\n"));
+  await radio.sendRequest(310);
+  assert.ok(await until(() => echo.written.some((m) => m.payloadVariant.case === "packet")));
+  assert.deepEqual(echo.collisions, []);
+  assert.ok(!core.log.some((l) => l.includes("ERREUR GATT")), core.log.join("\n"));
 });
 
 test("a T-Echo that goes silent is reported and released", async () => {

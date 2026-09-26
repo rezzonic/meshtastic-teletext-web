@@ -64,6 +64,15 @@ local ». Le lecteur lit donc aussi toutes les 150 ms pendant la configuration,
 puis chaque seconde. Le journal compte les lectures, les lectures vides et les
 notifications reçues.
 
+**Une opération Bluetooth à la fois** : Chrome sur Android refuse une
+opération GATT lancée pendant une autre (« GATT operation already in
+progress »), et la bibliothèque ne les sérialise pas : la demande de
+configuration pouvait partir pendant l'activation des notifications et
+échouer (`Device connection lost`, puis lectures toutes vides). Le lecteur
+ouvre donc le transport lui-même et fait passer toutes les lectures, écritures
+et activations par un même verrou ; le journal indique combien ont dû attendre
+leur tour, et nomme toute erreur GATT.
+
 **« le T-Echo n'envoie plus rien depuis 20 s »** : la connexion est libérée,
 touchez **Reconnecter**. Si cela se répète, vérifiez que l'app Meshtastic
 n'est pas connectée au même T-Echo (Paramètres Android → Applications →

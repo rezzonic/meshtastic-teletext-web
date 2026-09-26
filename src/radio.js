@@ -26,7 +26,8 @@ const SILENCE_TIMEOUT_MS = 20_000;
 const CONFIG_ONLY_NONCE = 69420;
 
 // The transport reads the T-Echo only after a write and when the T-Echo
-// notifies "fromNum". One empty read while the device is still preparing its
+// notifies "fromNum". Polling goes through the GATT lock like everything
+// else, so it waits its turn instead of colliding with a write. One empty read while the device is still preparing its
 // next item (the nRF52 of a T-Echo prepares them asynchronously), plus a
 // notification that never comes, and nothing is ever read again: the first
 // real run stopped right after the node identity. So we also read on a
@@ -44,6 +45,36 @@ function describe(err) {
   return err?.name ? `${err.name}: ${err.message}` : String(err);
 }
 
+/**
+ * One GATT operation at a time for the whole device. Chrome on Android
+ * rejects an operation started while another is running ("GATT operation
+ * already in progress"), and the transport does not serialise its own: its
+ * queue writes 200 ms after start without waiting for notifications to be
+ * enabled, and reads can overlap writes. That is what failed the
+ * want_config write on the third real run.
+ */
+function gattLock(stats, onError) {
+  let chain = Promise.resolve();
+  let inFlight = 0;
+  function run(name, fn) {
+    if (inFlight > 0) stats.waited += 1;
+    inFlight += 1;
+    const result = chain.then(fn);
+    chain = result.catch(() => {}).finally(() => { inFlight -= 1; });
+    result.catch((err) => onError(name, err));
+    return result;
+  }
+  return {
+    /** Route these methods of a characteristic through the lock. */
+    wrap(characteristic, names) {
+      for (const name of names) {
+        const original = characteristic[name]?.bind(characteristic);
+        if (original) characteristic[name] = (...args) => run(name, () => original(...args));
+      }
+    },
+  };
+}
+
 const Status = {
   1: "redemarrage",
   2: "deconnecte",
@@ -53,6 +84,7 @@ const Status = {
   6: "configuration",
   7: "pret",
 };
+const CONNECTED = 5;
 const CONFIGURED = 7;
 const DISCONNECTED = 2;
 
@@ -109,9 +141,8 @@ export class Radio {
     this.watchdog.start();
     try {
       this._log("connexion Bluetooth (GATT)...");
-      this.transport = await TransportWebBluetooth.createFromDevice(this.btDevice);
+      this.transport = await this._openTransport(this.btDevice);
       this._log("lien Bluetooth etabli, service Meshtastic trouve");
-      this._instrument(this.transport);
       const device = new MeshDevice(this.transport, CONFIG_ONLY_NONCE);
       // The library logs every packet at trace level; warnings are enough.
       device.log.settings.minLevel = 4;
@@ -123,7 +154,6 @@ export class Radio {
       device.configure().catch((err) => {
         if (device === this.device) this.core.error(`configuration: ${describe(err)}`);
       });
-      this._poll(POLL_CONFIGURING_MS);
     } catch (err) {
       this.watchdog.stop();
       this.core.error(`connexion impossible: ${describe(err)}`);
@@ -139,30 +169,46 @@ export class Radio {
     await this.disconnect();
   }
 
-  /** Count reads, empty reads and notifications, for the journal: they tell
-   * a silent device from a link whose notifications never arrive. */
-  _instrument(transport) {
-    const stats = { reads: 0, empty: 0, notifications: 0 };
+  /**
+   * TransportWebBluetooth.prepareConnection, but with every GATT operation
+   * going through one lock -- installed before the transport exists, so
+   * that enabling notifications, done in its constructor, is covered too.
+   * Also counts reads, empty reads and notifications for the journal.
+   */
+  async _openTransport(btDevice) {
+    const gatt = await btDevice.gatt.connect();
+    const service = await gatt.getPrimaryService(TransportWebBluetooth.ServiceUuid);
+    const toRadio = await service.getCharacteristic(TransportWebBluetooth.ToRadioUuid);
+    const fromRadio = await service.getCharacteristic(TransportWebBluetooth.FromRadioUuid);
+    const fromNum = await service.getCharacteristic(TransportWebBluetooth.FromNumUuid);
+
+    const stats = { reads: 0, empty: 0, notifications: 0, waited: 0 };
     this.stats = stats;
-    const fromRadio = transport.fromRadioCharacteristic;
-    if (fromRadio?.readValue) {
-      const read = fromRadio.readValue.bind(fromRadio);
-      fromRadio.readValue = async () => {
-        const value = await read();
-        stats.reads += 1;
-        if (value.byteLength === 0) stats.empty += 1;
-        return value;
-      };
+    const lock = gattLock(stats, (name, err) => {
+      this.core.error(`GATT ${name}: ${describe(err)}`);
+    });
+    for (const characteristic of [toRadio, fromRadio, fromNum]) {
+      lock.wrap(characteristic, ["readValue", "writeValue", "startNotifications",
+        "stopNotifications"]);
     }
-    transport.fromNumCharacteristic?.addEventListener?.(
-      "characteristicvaluechanged", () => { stats.notifications += 1; });
+    const read = fromRadio.readValue;
+    fromRadio.readValue = async () => {
+      const value = await read();
+      stats.reads += 1;
+      if (value.byteLength === 0) stats.empty += 1;
+      return value;
+    };
+    fromNum.addEventListener("characteristicvaluechanged", () => {
+      stats.notifications += 1;
+    });
+    return new TransportWebBluetooth(toRadio, fromRadio, fromNum, gatt);
   }
 
   _logStats() {
     const s = this.stats;
     if (s) {
       this.core.journal(`lectures ${s.reads} (dont ${s.empty} vides), `
-        + `notifications ${s.notifications}`);
+        + `notifications ${s.notifications}, operations mises en attente ${s.waited}`);
     }
   }
 
@@ -214,6 +260,7 @@ export class Radio {
       if (device !== this.device) return;
       dog.kick();
       core.journal(`etat: ${Status[s] ?? s}`);
+      if (s === CONNECTED && !this.connected) this._poll(POLL_CONFIGURING_MS);
       if (s === CONFIGURED) {
         dog.stop();
         this._poll(POLL_IDLE_MS);
