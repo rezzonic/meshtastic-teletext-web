@@ -24,14 +24,14 @@ const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 export const PAGE_TITLES = {
   100: "INDEX",
-  101: "METEO",
-  201: "ACTUALITES",
+  101: "MÉTÉO",
+  201: "ACTUALITÉS",
   301: "ALERTES",
-  310: "SIRENES",
-  311: "ALARME GENERALE",
+  310: "SIRÈNES",
+  311: "ALARME GÉNÉRALE",
   312: "ALARME EAU",
-  313: "SIRENES INFOS",
-  401: "ETAT DU MAILLAGE",
+  313: "SIRÈNES INFOS",
+  401: "ÉTAT DU MAILLAGE",
 };
 
 /** The latest moment at "hh:mm" not after `limit`, or null if invalid. */

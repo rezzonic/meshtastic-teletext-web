@@ -281,25 +281,25 @@ function demoRadio() {
     return hhmm(d);
   };
   const samples = {
-    100: "INDEX\n101 METEO 3m\n201 ACTUALITES 3m\n301 ALERTES 3m\n310 SIRENES 3m\n"
-      + "401 ETAT DU MAILLAGE 3m",
-    401: "MAILLAGE\n7 noeuds entendus <2h\ndirects 3, 1 saut 2, plus loin 2\n"
-      + "Teletext recu: 5 (jusqu'a 1 saut)\nDirects (SNR dB):\n"
+    100: "INDEX\n101 MÉTÉO 3m\n201 ACTUALITÉS 3m\n301 ALERTES 3m\n310 SIRÈNES 3m\n"
+      + "401 ÉTAT DU MAILLAGE 3m",
+    401: "MAILLAGE\n7 nœuds entendus <2h\ndirects 3, 1 saut 2, plus loin 2\n"
+      + "À portée: 7 (jusqu'à 3 sauts)\nDirects (SNR dB):\n"
       + "KNZ1 +6.5  ABCD -2.0  EFGH ?\nsuite: 402",
     402: "MAILLAGE (suite)\n1 saut:\nBULL  ROMT\n2 sauts:\nFRI1  GRUY",
-    101: "METEO DEMO\nAuj 18/9  couvert\nDem 20/11 soleil\nLun 15/8  pluie 12mm",
-    201: "ACTUALITES\n- Premier titre de demonstration\n- Deuxieme titre\n- Troisieme titre",
+    101: "MÉTÉO DÉMO\nAuj 18/9  couvert\nDem 20/11 soleil\nLun 15/8  pluie 12mm",
+    201: "ACTUALITÉS\n- Premier titre de démonstration\n- Deuxième titre\n- Troisième titre",
     301: "ALERTES (non officiel)\naucune alerte en cours\n(FR)",
-    310: "SIRENES\n311 Alarme generale\n312 Alarme eau\n313 Plus d'informations\n"
-      + "Test des sirenes: premier mercredi de fevrier\n"
+    310: "SIRÈNES\n311 Alarme générale\n312 Alarme eau\n313 Plus d'informations\n"
+      + "Test des sirènes: premier mercredi de février\n"
       + "Prochain test: mer 3.2.2027 13h30",
-    311: "ALARME GENERALE\nSon: /\\/\\/\\/\\/\\/\\ 1 min\n"
-      + "Son oscillant continu 1 min, repete apres 5 min.\n"
+    311: "ALARME GÉNÉRALE\nSon: /\\/\\/\\/\\/\\/\\ 1 min\n"
+      + "Son oscillant continu 1 min, répété après 5 min.\n"
       + "- Allumer la radio\n- Suivre les consignes\n- Informer les voisins",
     312: "ALARME EAU\nSon: __ __ __ __ __ x12\n"
-      + "12 sons graves de 20 s, pauses de 10 s. Pres des barrages.\n"
-      + "- Quitter immediatement la zone menacee",
-    313: `PLUS D'INFORMATIONS\nAlertes (FR) a ${minutesAgo(0)}:\naucune en cours\n`
+      + "12 sons graves de 20 s, pauses de 10 s. Près des barrages.\n"
+      + "- Quitter immédiatement la zone menacée",
+    313: `PLUS D'INFORMATIONS\nAlertes (FR) à ${minutesAgo(0)}:\naucune en cours\n`
       + "Non officiel: alert.swiss, radio",
   };
   // A source time on 101, a failed update on 201: what the header can say.
