@@ -121,8 +121,9 @@ ni rien de Node -- la différence qui a caché le défaut du logger.
 | `src/shims/` | remplaçants navigateur pour le logger Node embarqué dans `@meshtastic/core` |
 
 Les demandes sont construites à la main (`radio.js`) parce que
-`MeshDevice.sendText()` ne permet pas de fixer le `hop_limit` : à la valeur
-par défaut de 3, chaque demande coûterait huit fois plus au maillage. D'où la
+`MeshDevice.sendText()` ne permet pas de fixer le `hop_limit`. Il vaut 3 : un
+lecteur jusqu'à 3 sauts joint le serveur, qui répond à la distance parcourue
+par la demande. D'où la
 version **exacte** de `@bufbuild/protobuf`, identique à celle embarquée par
 `@meshtastic/core`.
 

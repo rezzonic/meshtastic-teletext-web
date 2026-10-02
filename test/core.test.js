@@ -1,7 +1,7 @@
 // ReaderCore: the same behaviour as ClientCore in the terminal client.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ReaderCore, Watchdog, LOG_LINES } from "../src/core.js";
+import { ReaderCore, Watchdog, LOG_LINES, GREET_FRESH_MS } from "../src/core.js";
 
 const T0 = new Date(2026, 8, 26, 14, 40);
 const ME = 0x1234;
@@ -155,4 +155,13 @@ test("watchdog kick restarts a running countdown, and only a running one", () =>
   dog.stop();
   dog.kick();
   assert.equal(dog.running, false);
+});
+
+test("on connecting, the index is asked for unless held fresh", () => {
+  const { core, time } = reader();
+  assert.equal(core.wantsGreeting(), true);            // nothing held
+  core.onText(2, 9, wire(100, "INDEX"));
+  assert.equal(core.wantsGreeting(), false);           // just received
+  time.now = new Date(T0.getTime() + GREET_FRESH_MS + 60_000);
+  assert.equal(core.wantsGreeting(), true);            // older than 5 min
 });

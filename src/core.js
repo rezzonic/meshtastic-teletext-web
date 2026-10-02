@@ -10,6 +10,10 @@ import { PageRegistry, decode, INDEX_PAGE, pad3 } from "./teletext.js";
 export const REQUEST_EVERY_MS = 60_000;
 export const REQUEST_GAP_MS = 10_000;
 
+// On connecting, the reader asks for the index unless it holds one this
+// recent: the server has no broadcast cycle and cannot see us connect.
+export const GREET_FRESH_MS = 5 * 60_000;
+
 // Lines kept in the connection journal.
 export const LOG_LINES = 50;
 
@@ -188,5 +192,11 @@ export class ReaderCore {
   /** Whether arriving on `number` should trigger a request. */
   needsRequest(number) {
     return !this.registry.has(number) || this.isStale(number);
+  }
+
+  /** Whether to ask for the index now that the link is up. */
+  wantsGreeting() {
+    const age = this.ageS(INDEX_PAGE);
+    return age === null || age * 1000 > GREET_FRESH_MS;
   }
 }

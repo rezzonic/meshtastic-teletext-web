@@ -374,10 +374,11 @@ export class Radio {
   }
 
   /**
-   * Broadcast "?NNN" on the teletext channel with hop limit 1.
+   * Broadcast "?NNN" on the teletext channel with hop limit HOP_LIMIT (3).
    *
-   * Built by hand because MeshDevice.sendText() has no hop limit: at the
-   * default of 3 a request would cost the mesh eight times as much.
+   * Built by hand because MeshDevice.sendText() sets no hop limit of its
+   * own -- the device default could be anything -- and the server measures
+   * our distance from hopStart, which must be what we chose.
    */
   async sendRequest(number) {
     if (!this.device || !this.connected || this.core.channelIndex === null) {

@@ -12,7 +12,9 @@ export const HEADER = /^T(\d{3}) (\d+)\/(\d+) (\d{2}:\d{2})\s*$/;
 export const REQUEST = /^\?(\d{3})\s*$/;
 
 export const CHANNEL_NAME = "TXT";
-export const HOP_LIMIT = 1;
+// Requests travel up to 3 hops, the server's ceiling; it answers with the
+// distance the request actually travelled (PROTOCOL.md, hop_limit).
+export const HOP_LIMIT = 3;
 export const INDEX_PAGE = 100;
 
 // A header up to this far ahead of our clock is clock skew, not yesterday.

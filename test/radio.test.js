@@ -128,7 +128,7 @@ test("a T-Echo that goes silent is reported and released", async () => {
   assert.equal(radio.transport, null);
 });
 
-test("a request goes out on TXT with hop limit 1, without waiting for an ack", async (t) => {
+test("a request goes out on TXT with hop limit 3, without waiting for an ack", async (t) => {
   const echo = fakeTEcho();
   const { core, radio } = setup(echo);
   t.after(() => radio.disconnect());
@@ -140,7 +140,7 @@ test("a request goes out on TXT with hop limit 1, without waiting for an ack", a
   assert.ok(await until(() => echo.written.some((m) => m.payloadVariant.case === "packet")));
   const packet = echo.written.find((m) => m.payloadVariant.case === "packet").payloadVariant.value;
   assert.equal(packet.channel, 2);
-  assert.equal(packet.hopLimit, 1);
+  assert.equal(packet.hopLimit, 3);
   assert.equal(packet.wantAck, false);
   assert.equal(packet.to, Constants.broadcastNum);
   assert.equal(new TextDecoder().decode(packet.payloadVariant.value.payload), "?310");

@@ -44,8 +44,22 @@ if (DEMO) {
   radio = new Radio(core, { channelName: CHANNEL_NAME, onChange: changed });
 }
 
+// Once per connection, ask for the index (core.wantsGreeting): without it a
+// reader would wait forever, the server sends nothing unasked.
+let greeted = false;
+
 function changed() {
   savePages();
+  const ready = radio.connected && core.channelIndex !== null;
+  if (!ready) {
+    greeted = false;
+  } else if (!greeted) {
+    greeted = true;
+    if (core.wantsGreeting()) {
+      core.journal("connexion: demande de l'index");
+      return ask(INDEX_PAGE, true);
+    }
+  }
   render();
 }
 
