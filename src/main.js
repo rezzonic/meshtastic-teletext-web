@@ -250,7 +250,11 @@ function demoRadio() {
   };
   const samples = {
     100: "INDEX\n101 METEO 3m\n201 ACTUALITES 3m\n301 ALERTES 3m\n310 SIRENES 3m\n"
-      + "311 ALARME GENERALE 3m\n312 ALARME EAU 3m\n313 SIRENES INFOS 3m",
+      + "401 ETAT DU MAILLAGE 3m",
+    401: "MAILLAGE\n7 noeuds entendus <2h\ndirects 3, 1 saut 2, plus loin 2\n"
+      + "Teletext recu: 5 (jusqu'a 1 saut)\nDirects (SNR dB):\n"
+      + "KNZ1 +6.5  ABCD -2.0  EFGH ?\nsuite: 402",
+    402: "MAILLAGE (suite)\n1 saut:\nBULL  ROMT\n2 sauts:\nFRI1  GRUY",
     101: "METEO DEMO\nAuj 18/9  couvert\nDem 20/11 soleil\nLun 15/8  pluie 12mm",
     201: "ACTUALITES\n- Premier titre de demonstration\n- Deuxieme titre\n- Troisieme titre",
     301: "ALERTES (non officiel)\naucune alerte en cours\n(FR)",
