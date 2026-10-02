@@ -173,3 +173,22 @@ button:focus-visible { outline: 3px solid var(--cyan); outline-offset: 2px; }
   padding: 8px 14px;
   min-height: 40px;
 }
+
+/* Siren tones, pages 311 and 312: drawn here, never sent over the radio. */
+.drawing { margin: 0 0 12px; }
+.drawing svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #070707;
+  border: 1px solid #222;
+  border-radius: 8px;
+}
+.siren-wave { fill: none; stroke: var(--yellow); stroke-width: 2.5; stroke-linejoin: round; }
+.siren-tone { fill: var(--yellow); }
+.siren-base { stroke: #444; stroke-width: 1; }
+.siren-axis { fill: var(--dim); font: 11px var(--mono); }
+.siren-on { fill: var(--cyan); font: 12px var(--mono); }
+.siren-off { fill: var(--dim); font: 12px var(--mono); }
+.siren-on-line { fill: none; stroke: var(--cyan); stroke-width: 1; }
+.siren-off-line { fill: none; stroke: var(--dim); stroke-width: 1; }

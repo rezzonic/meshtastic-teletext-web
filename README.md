@@ -16,6 +16,9 @@ texte. Ce lecteur ajoute :
 - la navigation par numéro de page, avec un pavé façon télécommande ;
 - un cache qui survit à un cycle manqué et à la fermeture de l'application ;
 - l'âge de chaque page, en rouge au-delà de 45 minutes ;
+- pour les pages 311 et 312 (alarme générale, alarme-eau), un dessin du son
+  de la sirène, généré ici à partir d'une ligne de signature : il ne passe pas
+  par la radio (`src/sirens.js`, et `PROTOCOL.md` du dépôt principal) ;
 - la demande d'une page au serveur (`?310`), limitée à une par page et par
   minute, espacées d'au moins 10 s : chaque demande coûte du temps d'antenne
   partagé. Feuilleter les pages en cache n'émet jamais rien.

@@ -2,6 +2,7 @@
 
 import { ReaderCore } from "./core.js";
 import { Radio, bluetoothAvailable } from "./radio.js";
+import { sirenSvg, splitSignature } from "./sirens.js";
 import {
   CHANNEL_NAME, INDEX_PAGE, agoFr, hhmm, pad3,
 } from "./teletext.js";
@@ -92,18 +93,27 @@ function render() {
 
   const age = $("age");
   const body = $("body");
+  const drawing = $("drawing");
   age.className = "age";
   if (page) {
     const stale = core.isStale(number);
     age.textContent = `produite a ${hhmm(page.produced)}, il y a `
       + `${agoFr(core.ageS(number))}${stale ? " - ANCIENNE" : ""}`;
     if (stale) age.classList.add("stale");
-    const [first, ...rest] = page.body.split("\n");
+    // Pages 311 and 312: the signature line becomes a drawing of the tone.
+    const { kind, body: text } = splitSignature(page);
+    if (drawing.dataset.kind !== (kind ?? "")) {
+      drawing.innerHTML = kind ? sirenSvg(kind) : ""; // our own markup only
+      drawing.dataset.kind = kind ?? "";
+    }
+    drawing.hidden = !kind;
+    const [first, ...rest] = text.split("\n");
     body.replaceChildren(
       Object.assign(document.createElement("span"),
         { className: "title", textContent: first }),
       document.createTextNode(rest.length ? `\n${rest.join("\n")}` : ""));
   } else {
+    drawing.hidden = true;
     age.textContent = "pas encore recue";
     age.classList.add("missing");
     const asked = core.askedAt.get(number);
@@ -239,13 +249,22 @@ function demoRadio() {
     return hhmm(d);
   };
   const samples = {
-    100: `INDEX\n101 METEO 3m\n201 ACTUALITES 3m\n301 ALERTES 3m\n310 SIRENES 3m`,
+    100: "INDEX\n101 METEO 3m\n201 ACTUALITES 3m\n301 ALERTES 3m\n310 SIRENES 3m\n"
+      + "311 ALARME GENERALE 3m\n312 ALARME EAU 3m\n313 SIRENES INFOS 3m",
     101: "METEO DEMO\nAuj 18/9  couvert\nDem 20/11 soleil\nLun 15/8  pluie 12mm",
     201: "ACTUALITES\n- Premier titre de demonstration\n- Deuxieme titre\n- Troisieme titre",
     301: "ALERTES (non officiel)\naucune alerte en cours\n(FR)",
-    310: "SIRENES\nGenerale: son oscillant 1 min, repete apres 5 min. Radio, "
-      + "consignes, informer voisins.\nEau: 12 sons graves de 20 s. Quitter la "
-      + "zone!\nTest: mer 3.2.2027 13h30",
+    310: "SIRENES\n311 Alarme generale\n312 Alarme eau\n313 Plus d'informations\n"
+      + "Test des sirenes: premier mercredi de fevrier\n"
+      + "Prochain test: mer 3.2.2027 13h30",
+    311: "ALARME GENERALE\nSon: /\\/\\/\\/\\/\\/\\ 1 min\n"
+      + "Son oscillant continu 1 min, repete apres 5 min.\n"
+      + "- Allumer la radio\n- Suivre les consignes\n- Informer les voisins",
+    312: "ALARME EAU\nSon: __ __ __ __ __ x12\n"
+      + "12 sons graves de 20 s, pauses de 10 s. Pres des barrages.\n"
+      + "- Quitter immediatement la zone menacee",
+    313: `PLUS D'INFORMATIONS\nAlertes (FR) a ${minutesAgo(0)}:\naucune en cours\n`
+      + "Non officiel: alert.swiss, radio",
   };
   const heard = (n, age) => core.onText(2, 9, `T${pad3(n)} 1/1 ${minutesAgo(age)}\n${samples[n]}`);
   heard(100, 3);
