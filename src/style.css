@@ -85,6 +85,9 @@ main {
 .age { font: 14px var(--mono); color: var(--green); margin: 2px 0 10px; }
 .age.stale { color: var(--red); font-weight: 700; }
 .age.missing { color: var(--dim); }
+.age .stale { color: var(--red); font-weight: 700; }
+.age .times { color: var(--dim); font-size: 12px; }
+.age .failing { color: var(--red); font-weight: 700; font-size: 12px; }
 .body {
   margin: 0;
   font: 17px/1.45 var(--mono);

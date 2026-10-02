@@ -165,3 +165,10 @@ test("on connecting, the index is asked for unless held fresh", () => {
   time.now = new Date(T0.getTime() + GREET_FRESH_MS + 60_000);
   assert.equal(core.wantsGreeting(), true);            // older than 5 min
 });
+
+test("a page remembers when it was received", () => {
+  const { core, time } = reader();
+  time.now = new Date(T0.getTime() + 90_000);
+  const page = core.onText(2, 9, wire(101, "METEO"));
+  assert.equal(page.received.getTime(), time.now.getTime());
+});

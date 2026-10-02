@@ -8,7 +8,9 @@
 // Times are local Date objects throughout. The header carries only hh:mm,
 // so server and reader are assumed to share a time zone.
 
-export const HEADER = /^T(\d{3}) (\d+)\/(\d+) (\d{2}:\d{2})\s*$/;
+// T<number> <part>/<total> <hh:mm>[ s<hh:mm>][ !]: generated at, the
+// source's own time, and "!" when the last update failed (PROTOCOL.md).
+export const HEADER = /^T(\d{3}) (\d+)\/(\d+) (\d{2}:\d{2})(?: s(\d{2}:\d{2}))?( !)?\s*$/;
 export const REQUEST = /^\?(\d{3})\s*$/;
 
 export const CHANNEL_NAME = "TXT";
@@ -31,6 +33,17 @@ export const PAGE_TITLES = {
   313: "SIRENES INFOS",
   401: "ETAT DU MAILLAGE",
 };
+
+/** The latest moment at "hh:mm" not after `limit`, or null if invalid. */
+function atOrBefore(text, limit) {
+  const [hh, mm] = text.split(":").map(Number);
+  if (hh > 23 || mm > 59) return null;
+  let when = new Date(limit.getFullYear(), limit.getMonth(), limit.getDate(), hh, mm);
+  if (when.getTime() > limit.getTime()) {
+    when = new Date(when.getFullYear(), when.getMonth(), when.getDate() - 1, hh, mm);
+  }
+  return when;
+}
 
 function toMinute(date) {
   const d = new Date(date.getTime());
@@ -64,8 +77,10 @@ export function decode(text, now = new Date()) {
       produced = new Date(produced.getFullYear(), produced.getMonth(),
         produced.getDate() - 1, hh, mm);
     }
+    const source = m[5] === undefined ? null : atOrBefore(m[5], produced);
+    if (m[5] !== undefined && source === null) return null;
     body = body.replace(/\r\n/g, "\n").replace(/\s+$/, "");
-    return { number, part, total, produced, body };
+    return { number, part, total, produced, source, failing: m[6] !== undefined, body };
   } catch {
     return null;
   }
@@ -165,6 +180,9 @@ export class PageRegistry {
     return [...this.pages.values()].map((p) => ({
       number: p.number, part: p.part, total: p.total,
       produced: p.produced.getTime(), body: p.body,
+      source: p.source ? p.source.getTime() : null,
+      failing: Boolean(p.failing),
+      received: p.received ? p.received.getTime() : null,
     }));
   }
 
@@ -177,6 +195,9 @@ export class PageRegistry {
       this.put({
         number: item.number, part: item.part || 1, total: item.total || 1,
         produced: new Date(item.produced), body: item.body,
+        source: Number.isFinite(item.source) ? new Date(item.source) : null,
+        failing: item.failing === true,
+        received: Number.isFinite(item.received) ? new Date(item.received) : null,
       });
     }
   }

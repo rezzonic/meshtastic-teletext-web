@@ -85,6 +85,7 @@ export class ReaderCore {
     if (this.me !== null && from === this.me) return null;
     const page = decode(text, this.now());
     if (!page) return null;
+    page.received = this.now(); // when it went on air, to a few seconds
     const held = this.registry.put(page);
     if (held === page) this.askedAt.delete(page.number);
     return held;

@@ -24,7 +24,9 @@ test("decode agrees with teletext.py on every vector", () => {
     } else {
       assert.ok(got, JSON.stringify(v.text));
       assert.deepEqual(
-        { ...got, produced: localIso(got.produced) }, v.page, JSON.stringify(v.text));
+        { ...got, produced: localIso(got.produced),
+          source: got.source && localIso(got.source) },
+        v.page, JSON.stringify(v.text));
     }
   }
 });
@@ -89,4 +91,21 @@ test("registry survives a round trip through storage", () => {
   copy.load([null, { number: "x" }, { number: 5, body: 3 }]);
   copy.load("garbage");
   assert.equal(copy.size, 2);
+});
+
+test("the cache keeps the source time, the failed mark and the reception", () => {
+  const reg = new PageRegistry();
+  const page = decode("T201 1/1 14:40 s14:20 !\nACTU", new Date(2026, 8, 26, 14, 41));
+  page.received = new Date(2026, 8, 26, 14, 41, 5);
+  reg.put(page);
+  const copy = new PageRegistry();
+  copy.load(JSON.parse(JSON.stringify(reg.toJSON())));
+  const got = copy.get(201);
+  assert.equal(got.source.getTime(), new Date(2026, 8, 26, 14, 20).getTime());
+  assert.equal(got.failing, true);
+  assert.equal(got.received.getTime(), page.received.getTime());
+  // A cache written by an older version has none of them.
+  copy.load([{ number: 101, produced: Date.now(), body: "x" }]);
+  assert.equal(copy.get(101).source, null);
+  assert.equal(copy.get(101).failing, false);
 });

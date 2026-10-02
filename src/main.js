@@ -110,10 +110,28 @@ function render() {
   const drawing = $("drawing");
   age.className = "age";
   if (page) {
+    // The three times of PROTOCOL.md: generated, from the source, and
+    // received -- which is when it went on air, to a few seconds.
     const stale = core.isStale(number);
-    age.textContent = `produite a ${hhmm(page.produced)}, il y a `
-      + `${agoFr(core.ageS(number))}${stale ? " - ANCIENNE" : ""}`;
-    if (stale) age.classList.add("stale");
+    const day = `${String(page.produced.getDate()).padStart(2, "0")}.`
+      + `${String(page.produced.getMonth() + 1).padStart(2, "0")}`;
+    const lines = [{
+      text: `generee le ${day} a ${hhmm(page.produced)}, il y a `
+        + `${agoFr(core.ageS(number))}${stale ? " - ANCIENNE" : ""}`,
+      cls: stale ? "stale" : "",
+    }];
+    const more = [];
+    if (page.source) more.push(`source ${hhmm(page.source)}`);
+    if (page.received) {
+      more.push(`recue a ${hhmm(page.received)}, il y a `
+        + agoFr((now - page.received) / 1000));
+    }
+    if (more.length) lines.push({ text: more.join(" · "), cls: "times" });
+    if (page.failing) {
+      lines.push({ text: "! mise a jour en echec : contenu precedent", cls: "failing" });
+    }
+    age.replaceChildren(...lines.map(({ text, cls }) => Object.assign(
+      document.createElement("div"), { textContent: text, className: cls })));
     // Pages 311 and 312: the signature line becomes a drawing of the tone.
     const { kind, body: text } = splitSignature(page);
     if (drawing.dataset.kind !== (kind ?? "")) {
@@ -284,7 +302,10 @@ function demoRadio() {
     313: `PLUS D'INFORMATIONS\nAlertes (FR) a ${minutesAgo(0)}:\naucune en cours\n`
       + "Non officiel: alert.swiss, radio",
   };
-  const heard = (n, age) => core.onText(2, 9, `T${pad3(n)} 1/1 ${minutesAgo(age)}\n${samples[n]}`);
+  // A source time on 101, a failed update on 201: what the header can say.
+  const extra = (n, age) => ({ 101: ` s${minutesAgo(age + 25)}`, 201: " !" }[n] ?? "");
+  const heard = (n, age) => core.onText(2, 9,
+    `T${pad3(n)} 1/1 ${minutesAgo(age)}${extra(n, age)}\n${samples[n]}`);
   heard(100, 3);
   heard(101, 3);
   heard(201, 3);
