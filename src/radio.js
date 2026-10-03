@@ -142,7 +142,7 @@ export class Radio {
     try {
       this._log("connexion Bluetooth (GATT)...");
       this.transport = await this._openTransport(this.btDevice);
-      this._log("lien Bluetooth etabli, service Meshtastic trouve");
+      this._log("lien Bluetooth établi, service Meshtastic trouvé");
       const device = new MeshDevice(this.transport, CONFIG_ONLY_NONCE);
       this._tameLogger(device.log);
       this.device = device;
@@ -232,7 +232,7 @@ export class Radio {
         + `${s.notifications}, operations mises en attente ${s.waited}`);
     }
     const kinds = Object.entries(this.kinds ?? {}).map(([k, n]) => `${k} ${n}`);
-    if (kinds.length) this.core.journal(`elements recus: ${kinds.join(", ")}`);
+    if (kinds.length) this.core.journal(`éléments reçus : ${kinds.join(", ")}`);
   }
 
   /**
@@ -310,7 +310,7 @@ export class Radio {
     device.events.onNodeInfoPacket.subscribe(() => {
       dog.kick();
       counts.nodes += 1;
-      if (counts.nodes % 25 === 0) this._log(`${counts.nodes} fiches de noeuds recues...`);
+      if (counts.nodes % 25 === 0) this._log(`${counts.nodes} fiches de nœuds reçues...`);
     });
     device.events.onConfigPacket.subscribe(() => { dog.kick(); counts.configs += 1; });
     device.events.onModuleConfigPacket.subscribe(() => { dog.kick(); counts.configs += 1; });
@@ -323,18 +323,18 @@ export class Radio {
     device.events.onDeviceStatus.subscribe((s) => {
       if (device !== this.device) return;
       dog.kick();
-      core.journal(`etat: ${Status[s] ?? s}`);
+      core.journal(`état : ${Status[s] ?? s}`);
       if (s === CONNECTED && !this.connected) this._poll(POLL_CONFIGURING_MS);
       if (s === CONFIGURED) {
         dog.stop();
         this._poll(POLL_IDLE_MS);
-        core.journal(`configuration recue: ${counts.nodes} fiches de noeuds, `
-          + `${counts.configs} reglages`);
+        core.journal(`configuration reçue : ${counts.nodes} fiches de nœuds, `
+          + `${counts.configs} réglages`);
         this._logStats();
       }
       this._set(Status[s] ?? String(s));
       if (s === CONFIGURED && core.channelIndex === null) {
-        core.error(`pas de canal secondaire nomme ${this.channelName} sur ce T-Echo`);
+        core.error(`pas de canal secondaire nommé ${this.channelName} sur ce T-Echo`);
         this.onChange();
       }
       if (s === DISCONNECTED) core.channelIndex = null;
@@ -343,7 +343,7 @@ export class Radio {
     device.events.onMyNodeInfo.subscribe((info) => {
       dog.kick();
       core.me = info.myNodeNum;
-      this._log(`noeud local !${(info.myNodeNum >>> 0).toString(16)}`);
+      this._log(`nœud local !${(info.myNodeNum >>> 0).toString(16)}`);
     });
 
     device.events.onChannelPacket.subscribe((channel) => {
@@ -356,7 +356,7 @@ export class Radio {
       if (channel.settings?.name !== this.channelName) return;
       if (channel.index === 0 || channel.role === roles.PRIMARY) {
         // Never read or write the teletext on the primary: the public mesh.
-        core.error(`${this.channelName} est le canal primaire: refuse`);
+        core.error(`${this.channelName} est le canal primaire : refusé`);
         return;
       }
       core.channelIndex = channel.index;
@@ -366,9 +366,9 @@ export class Radio {
     device.events.onMessagePacket.subscribe((message) => {
       try {
         const page = core.onText(message.channel, message.from, message.data);
-        if (page) this._log(`T${pad3(page.number)} recue`);
+        if (page) this._log(`T${pad3(page.number)} reçue`);
       } catch (err) {
-        core.error(`paquet ignore: ${describe(err)}`);
+        core.error(`paquet ignoré : ${describe(err)}`);
       }
     });
   }
@@ -382,7 +382,7 @@ export class Radio {
    */
   async sendRequest(number) {
     if (!this.device || !this.connected || this.core.channelIndex === null) {
-      throw new Error("pas connecte");
+      throw new Error("pas connecté");
     }
     const id = crypto.getRandomValues(new Uint32Array(1))[0];
     const packet = create(Protobuf.Mesh.MeshPacketSchema, {
@@ -412,6 +412,6 @@ export class Radio {
         if (err?.error === Protobuf.Mesh.Routing_Error.TIMEOUT) return;
         if (device === this.device) this.core.error(`demande ${encodeRequest(number)}: ${describe(err)}`);
       });
-    this._log(`demande ${encodeRequest(number)} envoyee`);
+    this._log(`demande ${encodeRequest(number)} envoyée`);
   }
 }

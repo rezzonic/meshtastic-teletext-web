@@ -56,7 +56,7 @@ function changed() {
   } else if (!greeted) {
     greeted = true;
     if (core.wantsGreeting()) {
-      core.journal("connexion: demande de l'index");
+      core.journal("connexion : demande de l'index");
       return ask(INDEX_PAGE, true);
     }
   }
@@ -72,9 +72,9 @@ async function ask(number, force) {
   try {
     await radio.sendRequest(number);
     core.markRequested(number);
-    core.note = `T${pad3(number)} demandee`;
+    core.note = `T${pad3(number)} demandée`;
   } catch (err) {
-    core.error(`demande non envoyee: ${err.message ?? err}`);
+    core.error(`demande non envoyée : ${err.message ?? err}`);
   }
   render();
 }
@@ -89,6 +89,13 @@ function arrive(number) {
 }
 
 // ----------------------------------------------------------------- screen
+
+// What the link states are called on screen; radio.js keeps plain ids.
+const STATUS_LABELS = {
+  redemarrage: "redémarrage", deconnecte: "déconnecté", connexion: "connexion",
+  reconnexion: "reconnexion", connecte: "connecté", configuration: "configuration",
+  pret: "prêt",
+};
 
 function render() {
   const now = core.now();
@@ -116,19 +123,19 @@ function render() {
     const day = `${String(page.produced.getDate()).padStart(2, "0")}.`
       + `${String(page.produced.getMonth() + 1).padStart(2, "0")}`;
     const lines = [{
-      text: `generee le ${day} a ${hhmm(page.produced)}, il y a `
+      text: `générée le ${day} à ${hhmm(page.produced)}, il y a `
         + `${agoFr(core.ageS(number))}${stale ? " - ANCIENNE" : ""}`,
       cls: stale ? "stale" : "",
     }];
     const more = [];
     if (page.source) more.push(`source ${hhmm(page.source)}`);
     if (page.received) {
-      more.push(`recue a ${hhmm(page.received)}, il y a `
+      more.push(`reçue à ${hhmm(page.received)}, il y a `
         + agoFr((now - page.received) / 1000));
     }
     if (more.length) lines.push({ text: more.join(" · "), cls: "times" });
     if (page.failing) {
-      lines.push({ text: "! mise a jour en echec : contenu precedent", cls: "failing" });
+      lines.push({ text: "! mise à jour en échec : contenu précédent", cls: "failing" });
     }
     age.replaceChildren(...lines.map(({ text, cls }) => Object.assign(
       document.createElement("div"), { textContent: text, className: cls })));
@@ -146,11 +153,11 @@ function render() {
       document.createTextNode(rest.length ? `\n${rest.join("\n")}` : ""));
   } else {
     drawing.hidden = true;
-    age.textContent = "pas encore recue";
+    age.textContent = "pas encore reçue";
     age.classList.add("missing");
     const asked = core.askedAt.get(number);
     body.textContent = asked
-      ? `Demandee a ${hhmm(asked)}, en attente.`
+      ? `Demandée à ${hhmm(asked)}, en attente.`
       : "Touchez Demander pour la demander au serveur.";
   }
 
@@ -186,10 +193,11 @@ function render() {
     connect.hidden = true;
   } else {
     const label = radio.status === "pret" && core.channelIndex !== null
-      ? `${CHANNEL_NAME} canal ${core.channelIndex}` : radio.status;
+      ? `${CHANNEL_NAME} canal ${core.channelIndex}`
+      : STATUS_LABELS[radio.status] ?? radio.status;
     status.textContent = label;
     if (radio.connected) status.classList.add("ok");
-    connect.textContent = radio.connected ? "Deconnecter"
+    connect.textContent = radio.connected ? "Déconnecter"
       : radio.btDevice ? "Reconnecter" : "Connecter";
     connect.disabled = ["connexion", "configuration", "reconnexion"]
       .includes(radio.status);
@@ -241,7 +249,7 @@ $("connect").addEventListener("click", async () => {
     else await radio.choose();
   } catch (err) {
     // Closing the device chooser lands here too; that is not an error.
-    if (err?.name === "NotFoundError") core.journal("liste fermee sans choix");
+    if (err?.name === "NotFoundError") core.journal("liste fermée sans choix");
     else core.error(`${err?.name ?? "Erreur"}: ${err?.message ?? err}`);
     render();
   }
@@ -251,16 +259,16 @@ $("journal-copy").addEventListener("click", async () => {
   const text = [
     `teletext-web ${location.href}`,
     `navigateur ${navigator.userAgent}`,
-    `etat ${radio.status}, canal ${core.channelIndex ?? "?"}`,
+    `état ${radio.status}, canal ${core.channelIndex ?? "?"}`,
     ...core.log,
   ].join("\n");
   try {
     await navigator.clipboard.writeText(text);
-    core.note = "journal copie";
+    core.note = "journal copié";
   } catch {
     // No clipboard permission: select the text so it can be copied by hand.
     getSelection().selectAllChildren($("journal-lines"));
-    core.note = "selectionnez et copiez le journal a la main";
+    core.note = "sélectionnez et copiez le journal à la main";
   }
   render();
 });
@@ -328,8 +336,8 @@ function demoRadio() {
 // ------------------------------------------------------------------ start
 
 if (!DEMO) loadPages();
-core.journal(DEMO ? "mode demo, sans radio"
-  : bluetoothAvailable() ? "pret: touchez Connecter" : "Web Bluetooth indisponible");
+core.journal(DEMO ? "mode démo, sans radio"
+  : bluetoothAvailable() ? "prêt : touchez Connecter" : "Web Bluetooth indisponible");
 if (!DEMO && !bluetoothAvailable()) $("unsupported").hidden = false;
 render();
 setInterval(render, 1000); // ages move even when nothing arrives

@@ -42,14 +42,14 @@ test("request policy", () => {
   const { core, time } = reader();
   assert.deepEqual(core.wantRequest(310), { ok: true, why: "" });
   core.onText(2, 9, wire(101));
-  assert.match(core.wantRequest(101).why, /a jour/);
+  assert.match(core.wantRequest(101).why, /à jour/);
   assert.equal(core.wantRequest(101, true).ok, true);
 
   core.markRequested(310);
   time.clock += 4_000;
   assert.match(core.wantRequest(401).why, /attendre 6 s/);
   time.clock += 26_000;
-  assert.match(core.wantRequest(310).why, /deja demandee il y a 30 s/);
+  assert.match(core.wantRequest(310).why, /déjà demandée il y a 30 s/);
   time.clock += 31_000;
   assert.equal(core.wantRequest(310).ok, true);
   assert.equal(core.wantRequest(1000).ok, false);

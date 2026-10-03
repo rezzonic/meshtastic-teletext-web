@@ -36,14 +36,14 @@ test("connects, asks for configuration only, finds TXT, receives a page", async 
   assert.equal(core.channelIndex, 2);
   assert.equal(core.me, ME);
   assert.ok(core.log.some((l) => l.includes("firmware 2.7.9")), core.log.join("\n"));
-  assert.ok(core.log.some((l) => l.includes("configuration recue: 0 fiches de noeuds")));
+  assert.ok(core.log.some((l) => l.includes("configuration reçue : 0 fiches de nœuds")));
 
   echo.hear("T101 1/1 14:40\nMETEO TEST");
   echo.hear("T201 1/1 14:40\nsur le canal public", 0);
   assert.ok(await until(() => core.registry.has(101)));
   await wait(50);
   assert.deepEqual(core.registry.numbers(), [101]);
-  assert.ok(core.log.some((l) => l.endsWith("T101 recue")));
+  assert.ok(core.log.some((l) => l.endsWith("T101 reçue")));
 });
 
 test("a long node download is not cut off while it progresses", async (t) => {
@@ -55,7 +55,7 @@ test("a long node download is not cut off while it progresses", async (t) => {
   await radio.connect();
   assert.ok(await until(() => radio.status === "pret", 10_000), core.log.join("\n"));
   assert.equal(core.errors.length, 0, core.log.join("\n"));
-  assert.ok(core.log.some((l) => l.includes("300 fiches de noeuds recues")));
+  assert.ok(core.log.some((l) => l.includes("300 fiches de nœuds reçues")));
   assert.equal(core.channelIndex, 2);
 });
 
@@ -102,7 +102,7 @@ test("in a browser, a library warning no longer kills the decoding", async (t) =
   assert.ok(await until(() => radio.status === "pret", 5000), core.log.join("\n"));
   assert.equal(core.channelIndex, 2);
   assert.ok(core.log.some((l) => /biblio: .*deviceuiConfig/.test(l)), core.log.join("\n"));
-  assert.ok(core.log.some((l) => /elements recus: .*deviceuiConfig 1/.test(l)), core.log.join("\n"));
+  assert.ok(core.log.some((l) => /éléments reçus : .*deviceuiConfig 1/.test(l)), core.log.join("\n"));
   assert.ok(!core.log.some((l) => l.includes("lecture illisible")), core.log.join("\n"));
 });
 
@@ -144,10 +144,10 @@ test("a request goes out on TXT with hop limit 3, without waiting for an ack", a
   assert.equal(packet.wantAck, false);
   assert.equal(packet.to, Constants.broadcastNum);
   assert.equal(new TextDecoder().decode(packet.payloadVariant.value.payload), "?310");
-  assert.ok(core.log.some((l) => l.endsWith("demande ?310 envoyee")));
+  assert.ok(core.log.some((l) => l.endsWith("demande ?310 envoyée")));
 });
 
 test("no request before the link is ready", async () => {
   const { radio } = setup(fakeTEcho());
-  await assert.rejects(radio.sendRequest(310), /pas connecte/);
+  await assert.rejects(radio.sendRequest(310), /pas connecté/);
 });

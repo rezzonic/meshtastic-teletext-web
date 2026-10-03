@@ -127,18 +127,18 @@ export class ReaderCore {
       return { ok: false, why: `page ${number} impossible` };
     }
     if (this.channelIndex === null) {
-      return { ok: false, why: "pas connecte au canal" };
+      return { ok: false, why: "pas connecté au canal" };
     }
     const age = this.ageS(number);
     if (!force && age !== null && age * 1000 <= this.staleMs) {
-      return { ok: false, why: `T${pad3(number)} est a jour` };
+      return { ok: false, why: `T${pad3(number)} est à jour` };
     }
     const clock = this.clock();
     const last = this.asked.get(number);
     if (last !== undefined && clock - last < REQUEST_EVERY_MS) {
       return {
         ok: false,
-        why: `T${pad3(number)} deja demandee il y a ${Math.trunc((clock - last) / 1000)} s`,
+        why: `T${pad3(number)} déjà demandée il y a ${Math.trunc((clock - last) / 1000)} s`,
       };
     }
     if (this.lastAsk !== null && clock - this.lastAsk < REQUEST_GAP_MS) {
