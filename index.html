@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Lecteur du teletext diffusé sur un canal Meshtastic, via un T-Echo en Bluetooth.">
+  <title>Teletext Meshtastic</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <script type="module" crossorigin src="./assets/index-Blq0GyDQ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CvqSBzpg.css">
+</head>
+<body>
+  <header class="bar">
+    <span class="brand">TELETEXT</span>
+    <span id="status" class="status">déconnecté</span>
+    <button id="connect" type="button" class="connect">Connecter</button>
+  </header>
+
+  <main>
+    <section class="screen" aria-live="polite">
+      <div class="head">
+        <span id="pageno" class="pageno">P100</span>
+        <span id="clock" class="clock">--:--</span>
+      </div>
+      <div id="age" class="age">pas encore reçue</div>
+      <div id="drawing" class="drawing" hidden></div>
+      <pre id="body" class="body"></pre>
+    </section>
+
+    <p id="note" class="note" role="status"></p>
+    <p id="error" class="error" role="alert" hidden></p>
+
+    <nav class="held" aria-label="Pages en cache">
+      <span class="label">En cache</span>
+      <span id="held"></span>
+    </nav>
+
+    <section class="pad" aria-label="Telecommande">
+      <button type="button" data-digit="1">1</button>
+      <button type="button" data-digit="2">2</button>
+      <button type="button" data-digit="3">3</button>
+      <button type="button" data-digit="4">4</button>
+      <button type="button" data-digit="5">5</button>
+      <button type="button" data-digit="6">6</button>
+      <button type="button" data-digit="7">7</button>
+      <button type="button" data-digit="8">8</button>
+      <button type="button" data-digit="9">9</button>
+      <button type="button" data-act="prev" aria-label="Page précédente">&#9664;</button>
+      <button type="button" data-digit="0">0</button>
+      <button type="button" data-act="next" aria-label="Page suivante">&#9654;</button>
+      <button type="button" data-act="index" class="wide red">Index</button>
+      <button type="button" data-act="back" class="green">Effacer</button>
+      <button type="button" data-act="ask" class="wide yellow">Demander</button>
+    </section>
+  </main>
+
+  <details id="journal" class="journal">
+    <summary>Journal de connexion <span id="journal-count"></span></summary>
+    <pre id="journal-lines"></pre>
+    <button id="journal-copy" type="button">Copier le journal</button>
+  </details>
+
+  <footer id="unsupported" class="unsupported" hidden>
+    Ce navigateur n'a pas Web Bluetooth. Ouvrez cette page dans Chrome sur
+    Android, en HTTPS. Pour voir l'interface sans radio :
+    <a href="?demo">mode demo</a>.
+  </footer>
+
+</body>
+</html>
